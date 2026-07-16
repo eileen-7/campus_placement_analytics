@@ -51,7 +51,6 @@ sql_package_trend = """
 """
 
 # Define the SQL query for Chart 3: Top Hiring Companies
-# We want the top 5 companies based on how many offers students actually accepted
 sql_top_companies = """
     SELECT 
         c.name AS company_name,
@@ -63,10 +62,25 @@ sql_top_companies = """
     LIMIT 5;
 """
 
+# Define the SQL query for Chart 4: Applied vs Placed Gap
+# We count how many unique students applied, and how many accepted an offer, grouped by department
+sql_gap = """
+    SELECT 
+        s.department,
+        COUNT(DISTINCT a.student_id) AS students_who_applied,
+        COUNT(DISTINCT CASE WHEN o.accepted = TRUE THEN o.student_id END) AS students_placed
+    FROM students s
+    LEFT JOIN applications a ON s.student_id = a.student_id
+    LEFT JOIN offers o ON s.student_id = o.student_id AND o.accepted = TRUE
+    GROUP BY s.department
+    ORDER BY students_who_applied DESC;
+"""
+
 # Use pandas to run the SQL queries and load the results into DataFrames (tables)
 df_placement_rate = pd.read_sql_query(sql_placement_rate, conn)
 df_package_trend = pd.read_sql_query(sql_package_trend, conn)
 df_top_companies = pd.read_sql_query(sql_top_companies, conn)
+df_gap = pd.read_sql_query(sql_gap, conn)
 
 # Plotly puts the first row of data at the bottom for horizontal charts.
 # We reverse our table (using .iloc[::-1]) to make the #1 company appear at the top!
@@ -95,11 +109,20 @@ fig_package_trend = px.line(
 
 # Chart 3: Create a horizontal bar chart for the top 5 hiring companies
 fig_top_companies = px.bar(
-    df_top_companies,                # The new data table for top companies
-    x='offers_accepted',             # The length of the bar is based on offers accepted
-    y='company_name',                # The labels on the side are the company names
-    orientation='h',                 # 'h' tells Plotly to draw the bars horizontally
-    title='Top 5 Hiring Companies (By Accepted Offers)' # Chart title
+    df_top_companies,                
+    x='offers_accepted',             
+    y='company_name',                
+    orientation='h',                 
+    title='Top 5 Hiring Companies (By Accepted Offers)' 
+)
+
+# Chart 4: Create a grouped bar chart for the applied vs placed gap
+fig_gap = px.bar(
+    df_gap,                                          # The new data table for the gap analysis
+    x='department',                                  # Department on the bottom axis
+    y=['students_who_applied', 'students_placed'],   # Plot BOTH of these columns on the vertical axis!
+    barmode='group',                                 # Put the bars side-by-side (grouped) instead of stacking them on top of each other
+    title='Applied vs Placed Gap by Department'      # Chart title
 )
 
 # --- STEP 3: DASHBOARD LAYOUT ---
@@ -123,8 +146,14 @@ app.layout = html.Div(
         
         # Add our third chart (Top Hiring Companies Horizontal Bar Chart)
         dcc.Graph(
-            id='top-companies-bar-chart', # A unique identifier for this new graph
-            figure=fig_top_companies      # We pass our new horizontal bar chart to be displayed
+            id='top-companies-bar-chart', 
+            figure=fig_top_companies      
+        ),
+        
+        # Add our fourth chart (Applied vs Placed Gap Grouped Bar Chart)
+        dcc.Graph(
+            id='applied-vs-placed-gap-chart', # A unique identifier for this new graph
+            figure=fig_gap                    # We pass our new grouped bar chart to be displayed
         )
     ]
 )
@@ -132,4 +161,3 @@ app.layout = html.Div(
 # Start the local development web server if we run this file directly
 if __name__ == '__main__':
     app.run(debug=True)
-
