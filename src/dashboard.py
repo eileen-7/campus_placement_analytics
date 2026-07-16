@@ -18,63 +18,107 @@ import warnings
 # Tell Python to ignore harmless UserWarnings from pandas
 warnings.filterwarnings('ignore', category=UserWarning)
 
-# Initialize the Dash application
+# Initialize the Dash application with a clean default font
 app = Dash(__name__)
 
 # --- STEP 1: GET DROPDOWN OPTIONS ON STARTUP ---
-# We need to know what years and departments actually exist in the database 
-# so we can put them in our dropdown menus.
 conn = get_connection()
-# Ask the database for all the unique years and unique departments
 df_years = pd.read_sql_query("SELECT DISTINCT graduation_year FROM students ORDER BY graduation_year;", conn)
 df_depts = pd.read_sql_query("SELECT DISTINCT department FROM students ORDER BY department;", conn)
 conn.close()
 
-# Convert those results into simple Python lists
 available_years = df_years['graduation_year'].tolist()
 available_departments = df_depts['department'].tolist()
 
+# --- CSS STYLES ---
+# We define some Python dictionaries containing CSS styles to make our dashboard look professional
+PAGE_STYLE = {
+    'backgroundColor': '#F4F7FC', # A very light, clean greyish-blue background
+    'padding': '40px', 
+    'fontFamily': 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
+}
+
+CARD_STYLE = {
+    'backgroundColor': 'white', 
+    'padding': '20px', 
+    'borderRadius': '12px', 
+    'boxShadow': '0 4px 8px rgba(0,0,0,0.05)', # Subtle shadow for a "floating" card effect
+    'flex': 1
+}
+
+FILTER_CONTAINER_STYLE = {
+    'backgroundColor': 'white', 
+    'padding': '20px', 
+    'borderRadius': '12px', 
+    'boxShadow': '0 4px 8px rgba(0,0,0,0.05)',
+    'marginBottom': '30px',
+    'display': 'flex', 
+    'gap': '30px' # Space between the two dropdowns
+}
+
+ROW_STYLE = {
+    'display': 'flex', 
+    'gap': '30px', 
+    'marginBottom': '30px'
+}
 
 # --- STEP 2: DASHBOARD LAYOUT ---
-# Define what the user will see on the screen
 app.layout = html.Div(
+    style=PAGE_STYLE,
     children=[
-        # Main heading for the dashboard
-        html.H1(children='Campus Placement Analytics Dashboard'),
-        
-        # Add our Interactive Filters! 
-        html.Div(
-            children=[
-                html.Label('Filter by Graduation Year:'),
-                dcc.Dropdown(
-                    id='year-filter', # Unique ID we will use to listen for changes
-                    # Create an option for every year, plus an "All" option
-                    options=[{'label': 'All Years', 'value': 'All'}] + [{'label': str(y), 'value': y} for y in available_years],
-                    value='All' # The default selected value
-                ),
-                
-                html.Label('Filter by Department:'),
-                dcc.Dropdown(
-                    id='department-filter', # Unique ID we will use to listen for changes
-                    # Create an option for every department, plus an "All" option
-                    options=[{'label': 'All Departments', 'value': 'All'}] + [{'label': d, 'value': d} for d in available_departments],
-                    value='All' # The default selected value
-                )
-            ], 
-            style={'width': '50%', 'marginBottom': '30px'} # Add a little spacing and width limit
+        # Main heading with an emoji
+        html.H1(
+            children='🎓 Campus Placement Analytics',
+            style={'textAlign': 'center', 'color': '#2C3E50', 'marginBottom': '40px', 'fontWeight': 'bold'}
         ),
         
-        # Add our four chart placeholders (They start empty and get filled by the callback!)
-        dcc.Graph(id='placement-rate-bar-chart'),
-        dcc.Graph(id='package-trend-line-chart'),
-        dcc.Graph(id='top-companies-bar-chart'),
-        dcc.Graph(id='applied-vs-placed-gap-chart')
+        # Interactive Filters Container
+        html.Div(
+            style=FILTER_CONTAINER_STYLE,
+            children=[
+                html.Div([
+                    html.Label('Graduation Year:', style={'fontWeight': 'bold', 'color': '#34495E', 'marginBottom': '5px', 'display': 'block'}),
+                    dcc.Dropdown(
+                        id='year-filter',
+                        options=[{'label': 'All Years', 'value': 'All'}] + [{'label': str(y), 'value': y} for y in available_years],
+                        value='All',
+                        clearable=False
+                    )
+                ], style={'flex': 1}),
+                
+                html.Div([
+                    html.Label('Department:', style={'fontWeight': 'bold', 'color': '#34495E', 'marginBottom': '5px', 'display': 'block'}),
+                    dcc.Dropdown(
+                        id='department-filter',
+                        options=[{'label': 'All Departments', 'value': 'All'}] + [{'label': d, 'value': d} for d in available_departments],
+                        value='All',
+                        clearable=False
+                    )
+                ], style={'flex': 1})
+            ]
+        ),
+        
+        # Charts Grid - Row 1
+        html.Div(
+            style=ROW_STYLE,
+            children=[
+                html.Div(style=CARD_STYLE, children=[dcc.Graph(id='placement-rate-bar-chart')]),
+                html.Div(style=CARD_STYLE, children=[dcc.Graph(id='package-trend-line-chart')])
+            ]
+        ),
+        
+        # Charts Grid - Row 2
+        html.Div(
+            style=ROW_STYLE,
+            children=[
+                html.Div(style=CARD_STYLE, children=[dcc.Graph(id='top-companies-bar-chart')]),
+                html.Div(style=CARD_STYLE, children=[dcc.Graph(id='applied-vs-placed-gap-chart')])
+            ]
+        )
     ]
 )
 
 # --- STEP 3: THE INTERACTIVE CALLBACK ---
-# The @app.callback is the "brain" of the interactive dashboard. 
-# It listens to the Inputs (our dropdowns) and updates the Outputs (our graphs).
 @app.callback(
     [Output('placement-rate-bar-chart', 'figure'),
      Output('package-trend-line-chart', 'figure'),
@@ -84,20 +128,14 @@ app.layout = html.Div(
      Input('department-filter', 'value')]
 )
 def update_charts(selected_year, selected_dept):
-    # Every time a user changes a dropdown, this function runs!
-    
-    # Re-connect to the database to fetch fresh, filtered data
     conn = get_connection()
     
-    # 1. Build our SQL Filters based on what the user selected
-    # If they selected "All", we use "1=1" which is a database trick that means "no filter".
+    # 1. Build SQL Filters
     year_filter = f"s.graduation_year = {selected_year}" if selected_year != 'All' else "1=1"
     dept_filter = f"s.department = '{selected_dept}'" if selected_dept != 'All' else "1=1"
-    
-    # Combine the filters. Example result: "s.graduation_year = 2023 AND s.department = 'Computer Science'"
     filters = f"{year_filter} AND {dept_filter}"
     
-    # 2. Write the 4 SQL Queries, injecting our dynamic filters into the WHERE clause
+    # 2. Write the 4 SQL Queries
     sql_placement = f"""
         SELECT 
             s.department,
@@ -155,23 +193,43 @@ def update_charts(selected_year, selected_dept):
     df_trend = pd.read_sql_query(sql_trend, conn)
     df_top_companies = pd.read_sql_query(sql_top_companies, conn)
     df_gap = pd.read_sql_query(sql_gap, conn)
-    
-    # Reverse top companies so the #1 company is at the top of the horizontal chart
     df_top_companies = df_top_companies.iloc[::-1]
-    
-    # Close connection
     conn.close()
     
-    # 4. Create the chart figures from the newly filtered data
-    fig1 = px.bar(df_placement, x='department', y='placement_rate_percent', title='Placement Rate by Department (%)')
-    fig2 = px.line(df_trend, x='graduation_year', y='avg_package_lpa', color='department', title='Average Package Trend Over Time (LPA)')
-    fig3 = px.bar(df_top_companies, x='offers_accepted', y='company_name', orientation='h', title='Top 5 Hiring Companies (By Accepted Offers)')
-    fig4 = px.bar(df_gap, x='department', y=['students_who_applied', 'students_placed'], barmode='group', title='Applied vs Placed Gap by Department')
+    # 4. Create the chart figures with a clean 'plotly_white' template and consistent colors
+    CHART_TEMPLATE = 'plotly_white'
+    MAIN_COLOR = '#3498DB' # Professional Dash Blue
     
-    # Return the four figures in the exact order we defined them in the Output list above
+    fig1 = px.bar(
+        df_placement, x='department', y='placement_rate_percent', 
+        title='Placement Rate by Department (%)',
+        template=CHART_TEMPLATE, color_discrete_sequence=[MAIN_COLOR]
+    )
+    
+    fig2 = px.line(
+        df_trend, x='graduation_year', y='avg_package_lpa', color='department', 
+        title='Average Package Trend Over Time (LPA)',
+        template=CHART_TEMPLATE, color_discrete_sequence=px.colors.qualitative.Safe
+    )
+    
+    fig3 = px.bar(
+        df_top_companies, x='offers_accepted', y='company_name', orientation='h', 
+        title='Top 5 Hiring Companies (By Accepted Offers)',
+        template=CHART_TEMPLATE, color_discrete_sequence=[MAIN_COLOR]
+    )
+    
+    fig4 = px.bar(
+        df_gap, x='department', y=['students_who_applied', 'students_placed'], barmode='group', 
+        title='Applied vs Placed Gap by Department',
+        template=CHART_TEMPLATE, color_discrete_sequence=['#95A5A6', '#2ECC71'] # Grey for applied, Green for placed
+    )
+    
+    # Remove the transparent background of the graphs to blend with the white cards
+    for fig in [fig1, fig2, fig3, fig4]:
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    
     return fig1, fig2, fig3, fig4
 
-# Start the local development web server if we run this file directly
+# Start the local development web server
 if __name__ == '__main__':
     app.run(debug=True)
-
