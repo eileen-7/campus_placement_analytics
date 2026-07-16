@@ -1,4 +1,4 @@
-# 🎓 Campus Placement Analytics
+# 🎓 Campus Placement Analyzer
 
 A full-stack, data-driven web application designed to analyze and visualize campus placement data. Built with PostgreSQL (ShaktiDB), Python, and Plotly Dash.
 
