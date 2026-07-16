@@ -68,7 +68,8 @@ def generate_sample_data():
         department = random.choice(departments)
         # Generate CGPA following a realistic distribution (between 6.0 and 10.0)
         cgpa = round(random.uniform(6.5, 9.8), 2)
-        graduation_year = 2026
+        # Generate students across multiple years so we can see a trend over time
+        graduation_year = random.choice([2023, 2024, 2025, 2026])
         
         cursor.execute(
             "INSERT INTO students (name, department, cgpa, graduation_year) VALUES (%s, %s, %s, %s) RETURNING student_id;",
