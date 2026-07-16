@@ -1,0 +1,11 @@
+# Database adapter to connect Python to ShaktiDB (PostgreSQL compatible)
+psycopg2-binary
+
+# Library for analyzing and manipulating tabular data
+pandas
+
+# Library for creating charts and graphs
+matplotlib
+
+# Library for generating realistic fake student data
+Faker
