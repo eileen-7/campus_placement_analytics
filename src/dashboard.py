@@ -23,8 +23,8 @@ app = Dash(__name__)
 # Connect to the database
 conn = get_connection()
 
-# Define the SQL query to calculate the placement rate percentage for each department
-sql_query = """
+# Define the SQL query for Chart 1: Placement Rate by Department
+sql_placement_rate = """
     SELECT 
         s.department,
         ROUND(
@@ -37,19 +37,43 @@ sql_query = """
     ORDER BY placement_rate_percent DESC;
 """
 
-# Use pandas to run the SQL query and load the results into a DataFrame (a data table)
-df_placement_rate = pd.read_sql_query(sql_query, conn)
+# Define the SQL query for Chart 2: Average Package Trend
+# We want to see how the average package changes over the graduation years for each department
+sql_package_trend = """
+    SELECT 
+        s.graduation_year,
+        s.department,
+        ROUND(AVG(o.package_lpa), 2) AS avg_package_lpa
+    FROM students s
+    JOIN offers o ON s.student_id = o.student_id
+    WHERE o.accepted = TRUE
+    GROUP BY s.graduation_year, s.department
+    ORDER BY s.graduation_year, s.department;
+"""
 
-# Close the database connection safely since we already have the data
+# Use pandas to run the SQL queries and load the results into DataFrames (tables)
+df_placement_rate = pd.read_sql_query(sql_placement_rate, conn)
+df_package_trend = pd.read_sql_query(sql_package_trend, conn)
+
+# Close the database connection safely since we already have all our data
 conn.close()
 
-# --- STEP 2: CREATE THE CHART ---
-# Create a bar chart using Plotly Express
+# --- STEP 2: CREATE THE CHARTS ---
+# Chart 1: Create a bar chart for placement rate
 fig_placement_rate = px.bar(
-    df_placement_rate,               # The data table we just created
-    x='department',                  # The column to use for the bottom axis (horizontal)
-    y='placement_rate_percent',      # The column to use for the height of the bars (vertical)
-    title='Placement Rate by Department (%)' # The title displayed above the chart
+    df_placement_rate,               # The first data table
+    x='department',                  # Bottom axis
+    y='placement_rate_percent',      # Vertical axis
+    title='Placement Rate by Department (%)' # Chart title
+)
+
+# Chart 2: Create a line chart for the average package trend over time
+fig_package_trend = px.line(
+    df_package_trend,                # The new data table for salary trends
+    x='graduation_year',             # Time (years) on the bottom axis
+    y='avg_package_lpa',             # Salary package on the vertical axis
+    color='department',              # Draw a separate colored line for each department
+    title='Average Package Trend Over Time (LPA)' # Chart title
 )
 
 # --- STEP 3: DASHBOARD LAYOUT ---
@@ -59,10 +83,16 @@ app.layout = html.Div(
         # Main heading for the dashboard
         html.H1(children='Campus Placement Analytics Dashboard'),
         
-        # Add the chart to our webpage layout using the dcc.Graph component
+        # Add our first chart (Placement Rate Bar Chart)
         dcc.Graph(
-            id='placement-rate-bar-chart', # A unique identifier for this specific graph
-            figure=fig_placement_rate      # We pass our created chart figure to be displayed
+            id='placement-rate-bar-chart',
+            figure=fig_placement_rate
+        ),
+        
+        # Add our second chart (Average Package Line Chart) right below the first one
+        dcc.Graph(
+            id='package-trend-line-chart', # A unique identifier for this new graph
+            figure=fig_package_trend       # We pass our new line chart figure to be displayed
         )
     ]
 )
@@ -70,4 +100,3 @@ app.layout = html.Div(
 # Start the local development web server if we run this file directly
 if __name__ == '__main__':
     app.run(debug=True)
-
