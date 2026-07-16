@@ -1,0 +1,22 @@
+# Python virtual environments
+.venv/
+venv/
+ENV/
+
+# Python bytecode cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment configuration files
+.env
+db_credentials.json
+
+# IDE specific files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
