@@ -68,7 +68,7 @@ app.layout = html.Div(
     children=[
         # Main heading with an emoji
         html.H1(
-            children='🎓 Campus Placement Analytics',
+            children='🎓 Campus Placement Analyzer',
             style={'textAlign': 'center', 'color': '#2C3E50', 'marginBottom': '40px', 'fontWeight': 'bold'}
         ),
         
