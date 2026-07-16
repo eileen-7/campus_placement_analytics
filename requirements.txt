@@ -4,8 +4,14 @@ psycopg2-binary
 # Library for analyzing and manipulating tabular data
 pandas
 
-# Library for creating charts and graphs
+# Library for creating charts and graphs (Keep for now if existing scripts use it)
 matplotlib
 
 # Library for generating realistic fake student data
 Faker
+
+# Web framework for building the interactive dashboard
+dash
+
+# Graphing library for creating interactive charts inside the dashboard
+plotly
