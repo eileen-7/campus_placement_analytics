@@ -38,7 +38,6 @@ sql_placement_rate = """
 """
 
 # Define the SQL query for Chart 2: Average Package Trend
-# We want to see how the average package changes over the graduation years for each department
 sql_package_trend = """
     SELECT 
         s.graduation_year,
@@ -51,9 +50,27 @@ sql_package_trend = """
     ORDER BY s.graduation_year, s.department;
 """
 
+# Define the SQL query for Chart 3: Top Hiring Companies
+# We want the top 5 companies based on how many offers students actually accepted
+sql_top_companies = """
+    SELECT 
+        c.name AS company_name,
+        COUNT(CASE WHEN o.accepted = TRUE THEN 1 END) AS offers_accepted
+    FROM companies c
+    JOIN offers o ON c.company_id = o.company_id
+    GROUP BY c.company_id, c.name
+    ORDER BY offers_accepted DESC
+    LIMIT 5;
+"""
+
 # Use pandas to run the SQL queries and load the results into DataFrames (tables)
 df_placement_rate = pd.read_sql_query(sql_placement_rate, conn)
 df_package_trend = pd.read_sql_query(sql_package_trend, conn)
+df_top_companies = pd.read_sql_query(sql_top_companies, conn)
+
+# Plotly puts the first row of data at the bottom for horizontal charts.
+# We reverse our table (using .iloc[::-1]) to make the #1 company appear at the top!
+df_top_companies = df_top_companies.iloc[::-1]
 
 # Close the database connection safely since we already have all our data
 conn.close()
@@ -61,19 +78,28 @@ conn.close()
 # --- STEP 2: CREATE THE CHARTS ---
 # Chart 1: Create a bar chart for placement rate
 fig_placement_rate = px.bar(
-    df_placement_rate,               # The first data table
-    x='department',                  # Bottom axis
-    y='placement_rate_percent',      # Vertical axis
-    title='Placement Rate by Department (%)' # Chart title
+    df_placement_rate,               
+    x='department',                  
+    y='placement_rate_percent',      
+    title='Placement Rate by Department (%)' 
 )
 
 # Chart 2: Create a line chart for the average package trend over time
 fig_package_trend = px.line(
-    df_package_trend,                # The new data table for salary trends
-    x='graduation_year',             # Time (years) on the bottom axis
-    y='avg_package_lpa',             # Salary package on the vertical axis
-    color='department',              # Draw a separate colored line for each department
-    title='Average Package Trend Over Time (LPA)' # Chart title
+    df_package_trend,                
+    x='graduation_year',             
+    y='avg_package_lpa',             
+    color='department',              
+    title='Average Package Trend Over Time (LPA)' 
+)
+
+# Chart 3: Create a horizontal bar chart for the top 5 hiring companies
+fig_top_companies = px.bar(
+    df_top_companies,                # The new data table for top companies
+    x='offers_accepted',             # The length of the bar is based on offers accepted
+    y='company_name',                # The labels on the side are the company names
+    orientation='h',                 # 'h' tells Plotly to draw the bars horizontally
+    title='Top 5 Hiring Companies (By Accepted Offers)' # Chart title
 )
 
 # --- STEP 3: DASHBOARD LAYOUT ---
@@ -89,10 +115,16 @@ app.layout = html.Div(
             figure=fig_placement_rate
         ),
         
-        # Add our second chart (Average Package Line Chart) right below the first one
+        # Add our second chart (Average Package Line Chart)
         dcc.Graph(
-            id='package-trend-line-chart', # A unique identifier for this new graph
-            figure=fig_package_trend       # We pass our new line chart figure to be displayed
+            id='package-trend-line-chart', 
+            figure=fig_package_trend       
+        ),
+        
+        # Add our third chart (Top Hiring Companies Horizontal Bar Chart)
+        dcc.Graph(
+            id='top-companies-bar-chart', # A unique identifier for this new graph
+            figure=fig_top_companies      # We pass our new horizontal bar chart to be displayed
         )
     ]
 )
@@ -100,3 +132,4 @@ app.layout = html.Div(
 # Start the local development web server if we run this file directly
 if __name__ == '__main__':
     app.run(debug=True)
+
